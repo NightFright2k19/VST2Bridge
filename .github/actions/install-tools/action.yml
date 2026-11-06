@@ -16,7 +16,6 @@ runs:
 
     - name: Install tools
       shell: bash
-      timeout-minutes: 10
       env:
         CACHE_HIT: ${{ steps.debs.outputs.cache-hit }}
       run: |
