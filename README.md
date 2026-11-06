@@ -13,7 +13,7 @@ The patcher writes a small bridge DLL and a CLAP bridge for each plugin into the
 
 The CLAP bridge has the VST2 bridge built in, so it works on its own: `<name>_x64.clap` needs only `<name>.dll` and the helper exe in the same folder, not `<name>_x64.dll`. It offers the same plugin with the same features to CLAP hosts.
 
-Windows VST2 hosts with [direct-loading support](docs/technical.md#direct-loading-on-windows) can use one bridge DLL to open plugins by path.
+Windows VST2 hosts with [direct-loading support](docs/host-integration.md) can use one bridge DLL to open plugins by path; host developers get the bridge DLLs and helpers as `VST2Bridge-DevKit-r<N>.zip` from the release page.
 
 ### Linux and macOS
 
@@ -45,6 +45,7 @@ The patcher's icon is the one of the SXG-Create-NF patcher; its artwork is deriv
 
 | Document | Contents |
 |---|---|
+| [Host integration](docs/host-integration.md) | Adding direct VST2Bridge loading to a Windows VST2 host |
 | [How the bridge works](docs/technical.md) | Processes, shared memory, threads, which VST2 calls are passed and how |
 | [Limitations](docs/limitations.md) | What does not work (yet) |
 | [Development](docs/development.md) | Building, tests, releases, project layout |

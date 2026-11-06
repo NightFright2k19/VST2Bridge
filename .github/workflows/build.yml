@@ -6,6 +6,7 @@ name: Autobuild
 #   VST2Bridge-Patcher-r<N>-linux.tar.gz             vst2bridge-linux.clap (built on ubuntu-22.04 for an old glibc) + the two helpers
 #   VST2Bridge-Patcher-r<N>-macos-applesilicon.zip   vst2bridge-macos (universal, gzipped) + the two helpers
 #   VST2Bridge-Patcher-r<N>-macos-intel.zip          the same, frozen on an Intel runner
+#   VST2Bridge-DevKit-r<N>.zip                       x86_host / x64_host: bridge DLL + helper for hosts with direct loading (not used by selfupdate.py)
 # The tag and the asset names are a contract with utility/selfupdate.py: change them together.
 
 on:
@@ -204,6 +205,22 @@ jobs:
           path: assets
           merge-multiple: true
 
+      - name: Download bridge files
+        uses: actions/download-artifact@v8
+        with:
+          name: bridge-bin
+          path: bridge-bin
+
+      - name: Pack developer kit
+        env:
+          NAME: VST2Bridge-DevKit-r${{ needs.version.outputs.revision }}
+        run: |
+          set -euo pipefail
+          mkdir -p kit/x86_host kit/x64_host
+          cp bridge-bin/vst2bridge-x86.dll bridge-bin/vst2bridge-host64.exe kit/x86_host/
+          cp bridge-bin/vst2bridge-x64.dll bridge-bin/vst2bridge-host32.exe kit/x64_host/
+          (cd kit && zip -r "../assets/$NAME.zip" x86_host x64_host)
+
       - name: List assets
         run: ls -la assets
 
@@ -224,6 +241,7 @@ jobs:
             - Windows: `...-windows.exe`
             - Linux: `...-linux.tar.gz` (extract, then run `VST2Bridge-Patcher`)
             - macOS: `...-macos-applesilicon.zip` (M1 and newer) or `...-macos-intel.zip` (extract, then open the app)
+            - Developers of Windows VST2 hosts: `VST2Bridge-DevKit-r<N>.zip` (the bridge DLLs and helpers for [direct loading](https://github.com/NightFright2k19/VST2Bridge/blob/main/docs/host-integration.md), no patcher)
 
             **INSTRUCTIONS**
             - Put the patcher into a folder together with your VST2 plugin DLLs (right next to it, no subfolders), or click **Add folder…** to search another folder (with its subfolders) as well. Untick the plugins you do not want.
@@ -237,7 +255,8 @@ jobs:
             **WHAT'S NEW**
             - Linux / macOS: one thread wake-up less per audio block.
             - Windows: less CPU and latency per audio block, especially with many instances (the audio thread polls briefly for the helper's answer; `VST2BRIDGE_SPIN=0` turns it off).
-            - Windows VST2 hosts can [open plugins by path](https://github.com/NightFright2k19/VST2Bridge/blob/main/docs/technical.md#direct-loading-on-windows) with `VST2BridgeCreateA/W`.
+            - Windows VST2 hosts can [open plugins by path](https://github.com/NightFright2k19/VST2Bridge/blob/main/docs/host-integration.md) with `VST2BridgeCreateA/W`.
+            - Developer kit for host authors: `VST2Bridge-DevKit-r<N>.zip` with `x86_host` (`vst2bridge-x86.dll` + `vst2bridge-host64.exe`) and `x64_host` (`vst2bridge-x64.dll` + `vst2bridge-host32.exe`).
             - See the [version history](https://github.com/NightFright2k19/VST2Bridge/blob/main/docs/versions.md); the patcher shows it with **What's new?**.
 
   history:

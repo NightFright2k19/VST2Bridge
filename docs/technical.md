@@ -19,7 +19,7 @@ All bridge DLLs of one bitness are the same file. With filename-based loading, t
 
 ## Direct loading on Windows
 
-A VST2 host can load the bridge DLL for its own bitness and resolve `VST2BridgeCreateA` or `VST2BridgeCreateW`. Both take the host callback and the original plugin's absolute DLL path and return a proxy `AEffect*`, or `NULL` on failure. `A` accepts the Windows ANSI code page and `W` accepts UTF-16. The declarations are in [`bridge/vst2bridge.h`](../bridge/vst2bridge.h).
+A VST2 host can load the bridge DLL for its own bitness and resolve `VST2BridgeCreateA` or `VST2BridgeCreateW`. Both take the host callback and the original plugin's absolute DLL path and return a proxy `AEffect*`, or `NULL` on failure. `A` accepts the Windows ANSI code page and `W` accepts UTF-16. The declarations are in [`bridge/vst2bridge.h`](../bridge/vst2bridge.h); the step-by-step guide for host authors, with an example and the release's developer kit, is [Host integration](host-integration.md).
 
 Keep the helper for the plugin's bitness beside the bridge DLL. The helper starts in the original plugin's directory, so the plugin can find its companion files. Close the returned proxy with `effClose` before unloading the bridge DLL. Direct loading uses the same protocol 2 and 1,024-event limits as filename-based loading.
 
