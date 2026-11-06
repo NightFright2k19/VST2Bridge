@@ -64,21 +64,11 @@ static void fill_info(void)
 static void sig_set(Sig* g)
 {
     if (g->s != INVALID_SOCKET) { char b = 1; send(g->s, &b, 1, 0); }
-    else if (g == &sig_audio_s) { MemoryBarrier(); if (InterlockedExchange((volatile LONG*)&sh->audio.sleep_s, 0)) SetEvent(g->ev); }   // only if the bridge sleeps
     else SetEvent(g->ev);
 }
 
-static SOCKET audio_sock = INVALID_SOCKET;      // net: the audio thread reads the bridge's signals itself (no reader thread, one wake-up less per block)
-
 static int hwait(HANDLE ev, int pump)
 {
-    if (ev == ev_audio_h && audio_sock != INVALID_SOCKET) {
-        char b[64];
-        int n = recv(audio_sock, b, sizeof b, 0);
-        if (n > 0) return 1;
-        if (quitting) return 0;
-        ExitProcess(0);                                             // the host has ended (or crashed)
-    }
     for (;;) {
         DWORD r = pump ? MsgWaitForMultipleObjects(1, &ev, FALSE, INFINITE, QS_SENDMESSAGE) : WaitForSingleObject(ev, INFINITE);
         if (r == WAIT_OBJECT_0) return 1;
@@ -129,10 +119,6 @@ static int hexchange(VbChan* ch, Sig* to, HANDLE in, int pump, int* active, Req*
     r->ret = f->ret;
     r->out_len = f->len < r->out_cap ? f->len : r->out_cap;
     if (ok && r->out && r->out_len) memcpy(r->out, f->data, r->out_len);
-    // The bridge may poll msg and depth instead of waiting for a signal (audio channel). Without this the state after the
-    // nested call (REPLY, depth = the bridge's request) looks like the reply to the bridge's own request, which is not
-    // given yet.
-    if (ch == &sh->audio) { ch->msg = VB_MSG_NONE; MemoryBarrier(); }
     ch->depth = d;
     return ok;
 }
@@ -521,15 +507,6 @@ static DWORD WINAPI audio_thread(LPVOID a)
     (void)a;
     audio_tid = GetCurrentThreadId();
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-    // MMCSS "Pro Audio": the scheduler keeps this thread running under load like the host's own audio thread (absent
-    // on old systems and under Wine: then nothing changes)
-    {
-        HMODULE av = LoadLibraryA("avrt.dll");
-        typedef HANDLE (WINAPI *Mm)(LPCWSTR, LPDWORD);
-        Mm mm = av ? (Mm)(void*)GetProcAddress(av, "AvSetMmThreadCharacteristicsW") : 0;
-        DWORD task = 0;
-        if (mm) mm(L"Pro Audio", &task);
-    }
     while (hwait(ev_audio_h, 0) && !quitting) serve_top(&sh->audio, &audio_active, &sig_audio_s);
     return 0;
 }
@@ -596,8 +573,7 @@ static int open_net(char* arg, HANDLE* map)
     sig_ready.s = sm; sig_main_s.s = sm; sig_main_v.s = sv; sig_audio_s.s = sa; sig_aux_s.s = sx;
     *map = map_file(file, (DWORD)sizeof(VbShared));
     if (!*map) return 0;
-    ev_main_h = start_reader(sm); ev_aux_h = start_reader(sx);
-    ev_audio_h = CreateEventA(0, FALSE, FALSE, 0); audio_sock = sa;     // only the identity of the signal: hwait reads the socket
+    ev_main_h = start_reader(sm); ev_audio_h = start_reader(sa); ev_aux_h = start_reader(sx);
     start_reader(sv);                                               // nothing comes this way; it notices a closed connection
     return 1;
 }
@@ -669,7 +645,7 @@ int WINAPI WinMain(HINSTANCE hi, HINSTANCE hp, LPSTR cmd, int show)
     edit_close();
     InterlockedExchange(&closing, 1);
     InterlockedExchange(&quitting, 1);
-    if (audio_sock != INVALID_SOCKET) shutdown(audio_sock, SD_RECEIVE); else SetEvent(ev_audio_h);
+    SetEvent(ev_audio_h);
     WaitForSingleObject(at, 2000);
     fx->dispatcher(fx, effClose, 0, 0, 0, 0);
     return 0;

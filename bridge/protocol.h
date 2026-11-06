@@ -22,7 +22,7 @@
 #include "vst2.h"
 
 #define VB_MAGIC        0x56324252u     // 'V2BR'
-#define VB_VERSION      3
+#define VB_VERSION      2
 #define VB_MAXDEPTH     8               // nested calls per channel
 #define VB_FRAME_DATA   65536           // bytes passed by pointer per call (larger chunks use a mapping of their own)
 #define VB_MAXCH        32              // audio channels each way
@@ -65,9 +65,6 @@ typedef struct {
     volatile int32_t msg;               // kind of the last message: VB_MSG_REQ (frame depth-1 waits) or VB_MSG_REPLY
     volatile int32_t owner;             // main channel: side that started the outermost call
     volatile int32_t lock;              // main channel, Linux / macOS: 0 or the side that holds the lock (replaces the mutex)
-    volatile int32_t sleep_s;           // audio channel, Windows: 1 = the bridge sleeps on the event audio_s, so the helper must set it;
-                                        // 0 = the bridge spins or is awake: the helper only writes msg (see docs/technical.md)
-    int32_t pad[3];
     VbFrame f[VB_MAXDEPTH];
 } VbChan;
 
