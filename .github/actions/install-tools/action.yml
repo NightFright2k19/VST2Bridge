@@ -23,6 +23,7 @@ runs:
         PKGS="gcc-mingw-w64 libxcb1-dev wine wine64 wine32:i386 xvfb xauth"
         # fail fast instead of hanging for half an hour on a stalled mirror
         APT="-o Acquire::Retries=5 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Dir::Cache::archives=$HOME/vb-debs -o APT::Keep-Downloaded-Packages=true"
+        sudo mkdir -p "$HOME/vb-debs/partial"
         sudo dpkg --add-architecture i386
         # dpkg -i needs no package lists (a runner starts without them) and orders the unpacking by dependencies itself
         if [ "$CACHE_HIT" = true ] && ls "$HOME"/vb-debs/*.deb >/dev/null 2>&1 \
@@ -35,4 +36,4 @@ runs:
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $APT $PKGS
         fi
         sudo chown -R "$USER" "$HOME/vb-debs"
-        rm -rf "$HOME/vb-debs/partial" "$HOME/vb-debs/lock"
+        sudo rm -rf "$HOME/vb-debs/partial" "$HOME/vb-debs/lock"
