@@ -4,7 +4,7 @@ What changed in each Autobuild release, newest first. Releases are numbered `r<N
 
 | Release | Date | Changes |
 |---|---|---|
-| next | | Windows and Linux / macOS bridges: the speed-ups of r15 (polling for the helper's answer, MMCSS, the helper reading its audio socket directly, protocol version 3) are taken out again, so the bridges work as in r14. The cause was a rare race in the polling that could answer a plugin's callback to the host twice. `VST2BRIDGE_SPIN` no longer has any effect. |
+| r20 | 2026-11-06 | Windows and Linux / macOS bridges: the speed-ups of r15 (polling for the helper's answer, MMCSS, the helper reading its audio socket directly, protocol version 3) are taken out again, so the bridges work as in r14. The cause was a rare race in the polling that could answer a plugin's callback to the host twice. `VST2BRIDGE_SPIN` no longer has any effect. |
 | r18 | 2026-11-06 | New developer kit `VST2Bridge-DevKit-r<N>.zip` in each release (`x86_host` and `x64_host` folders with the bridge DLL and helper) and a guide for adding direct loading to a Windows VST2 host ([docs/host-integration.md](host-integration.md)). |
 | r17 | 2026-11-05 | Internal: the tests also run the Linux CLAP with AddressSanitizer + UndefinedBehaviorSanitizer; the Linux / macOS bridge reads its "helper gone" flag atomically (no behaviour change). |
 | r15 | 2026-11-05 | Linux / macOS: the helper's audio thread reads the bridge's signals from its socket directly, one thread wake-up less per audio block. |
