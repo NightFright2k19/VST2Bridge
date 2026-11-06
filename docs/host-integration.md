@@ -4,6 +4,8 @@ Direct loading lets your host open an opposite-bitness VST2 plugin from its orig
 
 ## Deploy the bridge files
 
+Every release has a developer kit, `VST2Bridge-DevKit-r<N>.zip`, with these files: `x86_host/` (`vst2bridge-x86.dll`, `vst2bridge-host64.exe`) and `x64_host/` (`vst2bridge-x64.dll`, `vst2bridge-host32.exe`). The low-level details are in [How the bridge works](technical.md#direct-loading-on-windows).
+
 Your host chooses the bridge directory. Keep the helper beside the bridge DLL. Falcosoft BASS_VST specifically looks in a `VST2Bridge` subfolder beside `bass_vst.dll`.
 
 | Host | Plugin | DLL loaded by the host | EXE started by the DLL |
