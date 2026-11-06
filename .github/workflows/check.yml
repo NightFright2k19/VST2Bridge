@@ -14,27 +14,38 @@ on:
 
 permissions:
   contents: read
+  packages: read
+
+# a new push to a pull request cancels the run of the previous commit
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  image:
+    name: CI image
+    uses: ./.github/workflows/ci-image.yml
+    permissions:
+      contents: read
+      packages: write
+
   check:
     name: Bridge tests (Wine) and patcher
+    needs: image
     runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --shm-size=1g
+    defaults:
+      run:
+        shell: bash          # container jobs default to sh, the steps use bash features
     timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
-      - name: Install tools
-        run: |
-          set -euo pipefail
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          # no recommends: they pull in hundreds of MB (fonts, GStreamer ...) the tests do not need
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gcc-mingw-w64 libxcb1-dev wine wine64 wine32:i386 xvfb xauth
-
-      - name: Initialise Wine
-        timeout-minutes: 5
-        run: xvfb-run -a wine wineboot -i
 
       - name: Bridge tests
         timeout-minutes: 10
