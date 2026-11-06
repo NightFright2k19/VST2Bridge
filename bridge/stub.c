@@ -62,8 +62,6 @@ typedef struct {
     HANDLE srv_thread, aux_thread;
     char prefix[64];
     HWND msgwnd;                        // on the host's editor thread: sizeWindow requests are run there
-    double spin_us;                     // how long the audio thread polls for the helper's reply before it sleeps (0 = never)
-    int spin_miss, spin_pause;          // adaptive: replies that took longer, process calls that skip the polling
 #else
     pid_t pid;
     int fd[4], shm_fd, threads;         // connections M, V, A, X (see protocol.h)
@@ -156,51 +154,6 @@ static int chan_wait(Inst* p, int s, int pump)
         DWORD r = pump ? MsgWaitForMultipleObjects(2, w, FALSE, INFINITE, QS_SENDMESSAGE) : WaitForMultipleObjects(2, w, FALSE, INFINITE);
         if (r == WAIT_OBJECT_0) return !p->dead;
         if (r == WAIT_OBJECT_0 + 2) { MSG m; PeekMessageW(&m, 0, 0, 0, PM_NOREMOVE); continue; }   // runs the sent messages
-        vb_xchg(&p->dead, 1);
-        return 0;
-    }
-}
-
-static int audio_reply_ready(const VbChan* ch, int d)
-{
-    return (ch->msg == VB_MSG_REPLY && ch->depth == d + 1) || (ch->msg == VB_MSG_REQ && ch->depth > d + 1);
-}
-
-static double now_us(void)
-{
-    static double scale;
-    LARGE_INTEGER c; QueryPerformanceCounter(&c);
-    if (!scale) { LARGE_INTEGER f; QueryPerformanceFrequency(&f); scale = 1e6 / (double)f.QuadPart; }
-    return (double)c.QuadPart * scale;
-}
-
-// Audio channel: waits for the helper's reply (or its nested call) to the request at depth d. The reply of a plugin that
-// is quick often arrives within a few microseconds, which is faster than waking a sleeping thread, so the audio thread
-// polls the message word first. If that fails often (the plugin takes long) it stops polling for a while, so
-// that heavy plugins do not burn a core. Then it sleeps; the helper sets the event only if sleep_s says so.
-static int audio_wait(Inst* p, VbChan* ch, int d)
-{
-    if (p->spin_us > 0) {
-        if (p->spin_pause > 0) p->spin_pause--;
-        else {
-            double t0 = now_us();
-            do {
-                vb_barrier();
-                if (audio_reply_ready(ch, d)) { p->spin_miss = 0; return !p->dead; }
-                YieldProcessor();
-            } while (now_us() - t0 < p->spin_us);
-            if (++p->spin_miss >= 8) { p->spin_miss = 0; p->spin_pause = 256; }
-        }
-    }
-    HANDLE w[2] = { p->sig[S_AUDIO_S], p->proc };
-    for (;;) {
-        vb_xchg(&ch->sleep_s, 1);                                    // full barrier: msg is read after sleep_s is written
-        if (audio_reply_ready(ch, d)) {
-            if (vb_xchg(&ch->sleep_s, 0)) return !p->dead;           // the helper has not set the event and will not
-            // the helper saw sleep_s = 1 and sets (or has set) the event: take it, so that none is left over
-        }
-        DWORD r = WaitForMultipleObjects(2, w, FALSE, INFINITE);
-        if (r == WAIT_OBJECT_0) return !p->dead;
         vb_xchg(&p->dead, 1);
         return 0;
     }
@@ -635,10 +588,6 @@ static int exchange(Inst* p, VbChan* ch, int to, int in, int pump, Req* r)
     ch->msg = VB_MSG_REQ;
     sig_send(p, to);
     for (;;) {
-#ifdef _WIN32
-        if (ch == &p->sh->audio) { if (!audio_wait(p, ch, d)) return 0; }
-        else
-#endif
         if (!chan_wait(p, in, pump)) return 0;
         vb_barrier();
         if (ch->msg == VB_MSG_REPLY && ch->depth == d + 1) break;
@@ -1031,14 +980,6 @@ static AEffect* create(AudioMasterCallback master, const StartPaths* paths)
     if (!p) return 0;
     vb_mutex_init(&p->audio_cs); vb_mutex_init(&p->ev_cs);
     p->master = master; p->loading = 1;
-#ifdef _WIN32
-    {                                                               // VST2BRIDGE_SPIN = microseconds to poll for the reply (0 = off)
-        SYSTEM_INFO si; GetSystemInfo(&si);
-        const char* e = getenv("VST2BRIDGE_SPIN");
-        p->spin_us = si.dwNumberOfProcessors > 1 ? (e ? atof(e) : 30.0) : 0;
-        if (p->spin_us > 1000) p->spin_us = 1000;
-    }
-#endif
     AEffect* fx = &p->fx;
     fx->magic = kEffectMagic; fx->dispatcher = vst_dispatch; fx->process = vst_process;
     fx->setParameter = vst_set_parameter; fx->getParameter = vst_get_parameter;

@@ -64,7 +64,6 @@ static void fill_info(void)
 static void sig_set(Sig* g)
 {
     if (g->s != INVALID_SOCKET) { char b = 1; send(g->s, &b, 1, 0); }
-    else if (g == &sig_audio_s) { MemoryBarrier(); if (InterlockedExchange((volatile LONG*)&sh->audio.sleep_s, 0)) SetEvent(g->ev); }   // only if the bridge sleeps
     else SetEvent(g->ev);
 }
 
@@ -120,10 +119,6 @@ static int hexchange(VbChan* ch, Sig* to, HANDLE in, int pump, int* active, Req*
     r->ret = f->ret;
     r->out_len = f->len < r->out_cap ? f->len : r->out_cap;
     if (ok && r->out && r->out_len) memcpy(r->out, f->data, r->out_len);
-    // The bridge may poll msg and depth instead of waiting for a signal (audio channel). Without this the state after the
-    // nested call (REPLY, depth = the bridge's request) looks like the reply to the bridge's own request, which is not
-    // given yet.
-    if (ch == &sh->audio) { ch->msg = VB_MSG_NONE; MemoryBarrier(); }
     ch->depth = d;
     return ok;
 }
@@ -512,15 +507,6 @@ static DWORD WINAPI audio_thread(LPVOID a)
     (void)a;
     audio_tid = GetCurrentThreadId();
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL);
-    // MMCSS "Pro Audio": the scheduler keeps this thread running under load like the host's own audio thread (absent
-    // on old systems and under Wine: then nothing changes)
-    {
-        HMODULE av = LoadLibraryA("avrt.dll");
-        typedef HANDLE (WINAPI *Mm)(LPCWSTR, LPDWORD);
-        Mm mm = av ? (Mm)(void*)GetProcAddress(av, "AvSetMmThreadCharacteristicsW") : 0;
-        DWORD task = 0;
-        if (mm) mm(L"Pro Audio", &task);
-    }
     while (hwait(ev_audio_h, 0) && !quitting) serve_top(&sh->audio, &audio_active, &sig_audio_s);
     return 0;
 }
