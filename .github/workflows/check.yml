@@ -15,6 +15,11 @@ on:
 permissions:
   contents: read
 
+# a new push to a pull request cancels the run of the previous commit
+concurrency:
+  group: check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     name: Bridge tests (Wine) and patcher
@@ -25,12 +30,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: Install tools
-        run: |
-          set -euo pipefail
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          # no recommends: they pull in hundreds of MB (fonts, GStreamer ...) the tests do not need
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gcc-mingw-w64 libxcb1-dev wine wine64 wine32:i386 xvfb xauth
+        uses: ./.github/actions/install-tools
 
       - name: Initialise Wine
         timeout-minutes: 5

@@ -1,0 +1,39 @@
+name: Install bridge build and test tools
+description: >
+  mingw-w64, libxcb, Wine (32 + 64 bit) and Xvfb for the bridge tests. The .deb files are cached, so a run with a
+  cache hit needs no apt-get update and no download from the Ubuntu mirrors (they are sometimes very slow).
+
+runs:
+  using: composite
+  steps:
+    - name: Restore cached .deb files
+      id: debs
+      uses: actions/cache@v5
+      with:
+        path: ~/vb-debs/*.deb
+        # ImageVersion: the runner image changes the set of preinstalled packages, and with it the set of files to download
+        key: vb-debs-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageVersion }}-${{ hashFiles('.github/actions/install-tools/action.yml') }}
+
+    - name: Install tools
+      shell: bash
+      timeout-minutes: 10
+      env:
+        CACHE_HIT: ${{ steps.debs.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+        PKGS="gcc-mingw-w64 libxcb1-dev wine wine64 wine32:i386 xvfb xauth"
+        # fail fast instead of hanging for half an hour on a stalled mirror
+        APT="-o Acquire::Retries=5 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Dir::Cache::archives=$HOME/vb-debs -o APT::Keep-Downloaded-Packages=true"
+        sudo dpkg --add-architecture i386
+        # dpkg -i needs no package lists (a runner starts without them) and orders the unpacking by dependencies itself
+        if [ "$CACHE_HIT" = true ] && ls "$HOME"/vb-debs/*.deb >/dev/null 2>&1 \
+           && sudo DEBIAN_FRONTEND=noninteractive dpkg -i "$HOME"/vb-debs/*.deb; then
+          echo "installed from the cache"
+        else
+          echo "cache miss (or incomplete): downloading"
+          sudo apt-get update $APT
+          # no recommends: they pull in hundreds of MB (fonts, GStreamer ...) the tests do not need
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $APT $PKGS
+        fi
+        sudo chown -R "$USER" "$HOME/vb-debs"
+        rm -rf "$HOME/vb-debs/partial" "$HOME/vb-debs/lock"
