@@ -1,0 +1,48 @@
+name: CI image
+
+# Reusable workflow (called by check.yml and build.yml): makes sure the CI image for the current
+# .github/docker/ci/Dockerfile exists in GHCR (build + push when it does not) and returns its name. When the image is
+# there already this takes a few seconds, so the Wine tests start without installing anything.
+
+on:
+  workflow_call:
+    outputs:
+      image:
+        description: Full name of the image (tag = hash of the Dockerfile)
+        value: ${{ jobs.image.outputs.image }}
+
+jobs:
+  image:
+    name: CI image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      image: ${{ steps.name.outputs.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Image name
+        id: name
+        run: |
+          set -euo pipefail
+          owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "image=ghcr.io/$owner/vst2bridge-ci:$(sha256sum .github/docker/ci/Dockerfile | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build and push when missing
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+        run: |
+          set -euo pipefail
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo "$IMAGE exists"
+            exit 0
+          fi
+          echo "$IMAGE is missing: building"
+          docker build -t "$IMAGE" .github/docker/ci
+          docker push "$IMAGE" || { echo "::error::Could not push $IMAGE (a pull request from a fork cannot write packages: let a maintainer build the image first, e.g. by running the Check workflow from a branch of this repository)"; exit 1; }
