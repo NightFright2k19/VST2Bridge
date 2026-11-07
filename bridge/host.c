@@ -255,6 +255,10 @@ static LRESULT CALLBACK ed_proc(HWND w, UINT m, WPARAM wp, LPARAM lp)
 {
     if (m == WM_TIMER && fx && editor_open) { fx->dispatcher(fx, effEditIdle, 0, 0, 0, 0); return 0; }
     if (m == WM_CLOSE && ed_mode == VB_F_FLOATING) { ShowWindow(w, SW_HIDE); sh->editor_closed = 1; return 0; }  // closing only hides it
+    // The editor is a child of the host's window, which belongs to another process. DefWindowProc would pass a wheel
+    // message the plugin did not use up to that window with a blocking SendMessage while the host turns the wheel into
+    // effVendorSpecific('stCA', 'Whee') and waits for this thread: both wait for each other (FL Studio hang, #30).
+    if (m == WM_MOUSEWHEEL || m == WM_MOUSEHWHEEL) return 0;
     return DefWindowProcW(w, m, wp, lp);
 }
 

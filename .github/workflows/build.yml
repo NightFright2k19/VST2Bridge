@@ -17,7 +17,7 @@ on:
       - 'utility/**'
       - 'bridge/**'
       - '.github/workflows/build.yml'
-  workflow_dispatch:
+  workflow_dispatch:                        # on a branch other than main: test build, no release (patchers = artifacts of the run)
 
 permissions:
   contents: write
@@ -203,6 +203,7 @@ jobs:
   release:
     name: Create release
     needs: [version, build]
+    if: github.ref == 'refs/heads/main'     # a manual run on another branch only keeps the patchers as workflow artifacts (test build)
     runs-on: ubuntu-24.04
     steps:
       - name: Download patchers
