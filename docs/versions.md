@@ -4,6 +4,8 @@ What changed in each Autobuild release, newest first. Releases are numbered `r<N
 
 | Release | Date | Changes |
 |---|---|---|
+| next | | Windows bridge: a plugin that opens a message box or dialog no longer freezes the host; the helper answers the host's calls while the dialog is open ([#30](https://github.com/NightFright2k19/VST2Bridge/issues/30)). |
+| next | | Windows bridge: the mouse wheel no longer freezes the host. A wheel turn that the plugin did not use up was passed on to the host's window while the host waited for the helper (FL Studio with e.g. Pro-53 or Xphraze; [#30](https://github.com/NightFright2k19/VST2Bridge/issues/30)). |
 | r20 | 2026-11-06 | Windows and Linux / macOS bridges: the speed-ups of r15 (polling for the helper's answer, MMCSS, the helper reading its audio socket directly, protocol version 3) are taken out again, so the bridges work as in r14. The cause was a rare race in the polling that could answer a plugin's callback to the host twice. `VST2BRIDGE_SPIN` no longer has any effect. |
 | r18 | 2026-11-06 | New developer kit `VST2Bridge-DevKit-r<N>.zip` in each release (`x86_host` and `x64_host` folders with the bridge DLL and helper) and a guide for adding direct loading to a Windows VST2 host ([docs/host-integration.md](host-integration.md)). |
 | r17 | 2026-11-05 | Internal: the tests also run the Linux CLAP with AddressSanitizer + UndefinedBehaviorSanitizer; the Linux / macOS bridge reads its "helper gone" flag atomically (no behaviour change). |
