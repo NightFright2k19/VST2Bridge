@@ -257,8 +257,12 @@ static LRESULT CALLBACK ed_proc(HWND w, UINT m, WPARAM wp, LPARAM lp)
         // A plugin that opens a modal dialog (MessageBox, DialogBox) runs its own message loop on this thread and does
         // not look at ev_main_h, while the host is blocked in a call waiting for us and shares our input queue, so
         // the dialog never gets its clicks (Hypersonic 2, #30). Timers are dispatched by modal loops: serve here.
-        if (!main_active && WaitForSingleObject(ev_main_h, 0) == WAIT_OBJECT_0) serve_top(&sh->main, &main_active, main_to_stub());
-        fx->dispatcher(fx, effEditIdle, 0, 0, 0, 0);
+        // effEditClose is left to the main loop (it destroys this window); and nothing runs after it closed the editor.
+        VbChan* mc = &sh->main;
+        int pending = mc->msg == VB_MSG_REQ && mc->depth >= 1;
+        if (!main_active && pending && mc->f[mc->depth - 1].op != effEditClose && WaitForSingleObject(ev_main_h, 0) == WAIT_OBJECT_0)
+            serve_top(mc, &main_active, main_to_stub());
+        if (editor_open) fx->dispatcher(fx, effEditIdle, 0, 0, 0, 0);
         return 0;
     }
     if (m == WM_CLOSE && ed_mode == VB_F_FLOATING) { ShowWindow(w, SW_HIDE); sh->editor_closed = 1; return 0; }  // closing only hides it
